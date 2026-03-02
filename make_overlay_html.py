@@ -1266,6 +1266,60 @@ _SECTION_MAPS = {
 
 import re as _re
 
+# ── 섹션별 위키피디아 기사명 (사진 동적 로딩용) ──────────────────
+# 일본어 위키피디아 titles — JS에서 Pageimages API로 썸네일 취득
+_SECTION_WIKI = {
+  # ── 낮 일정 ───────────────────────────────────────────────────
+  ("fukuoka","daytime"):   ["太宰府天満宮","海の中道海浜公園","舞鶴公園_(福岡市)"],
+  ("miyazaki","daytime"):  ["青島_(宮崎市)","宮崎神宮","堀切峠"],
+  ("kagoshima","daytime"): ["桜島","知覧特攻平和会館","仙巌園"],
+  ("oita","daytime"):      ["別府地獄めぐり","由布院温泉","高崎山自然動物園"],
+  ("kumamoto","daytime"):  ["熊本城","阿蘇山","水前寺成趣園"],
+  ("nagasaki","daytime"):  ["グラバー園","出島","長崎原爆資料館"],
+  ("naha","daytime"):      ["首里城","国際通り_(那覇市)","沖縄美ら海水族館"],
+  ("kitakyushu","daytime"):["門司港レトロ地区","皿倉山","旦過市場"],
+  ("hiroshima","daytime"): ["原爆ドーム","厳島神社","広島城"],
+  ("okayama","daytime"):   ["後楽園_(岡山市)","倉敷美観地区","岡山城"],
+  ("matsuyama","daytime"): ["道後温泉本館","松山城_(愛媛県)","坊っちゃん列車"],
+  ("sapporo","daytime"):   ["大通公園","北海道庁旧本庁舎","札幌時計台"],
+  ("hakodate","daytime"):  ["函館山","金森赤レンガ倉庫","旧函館区公会堂"],
+  ("sendai","daytime"):    ["仙台城","松島","定禅寺通り"],
+  ("kanazawa","daytime"):  ["兼六園","東山ひがし","金沢21世紀美術館"],
+  # ── 음식 ──────────────────────────────────────────────────────
+  ("fukuoka","food"):      ["博多ラーメン","屋台_(日本)"],
+  ("miyazaki","food"):     ["チキン南蛮","宮崎地鶏"],
+  ("kagoshima","food"):    ["黒豚","さつま揚げ"],
+  ("oita","food"):         ["とり天","地獄蒸し"],
+  ("kumamoto","food"):     ["馬刺し","からし蓮根"],
+  ("nagasaki","food"):     ["長崎ちゃんぽん","皿うどん"],
+  ("naha","food"):         ["ゴーヤーチャンプルー","沖縄そば"],
+  ("kitakyushu","food"):   ["焼きうどん","旦過市場"],
+  ("hiroshima","food"):    ["広島焼き","カキ_(貝)"],
+  ("okayama","food"):      ["ままかり","祭り寿司"],
+  ("matsuyama","food"):    ["じゃこ天","鯛めし"],
+  ("sapporo","food"):      ["味噌ラーメン","毛ガニ"],
+  ("hakodate","food"):     ["函館朝市","塩ラーメン"],
+  ("sendai","food"):       ["牛タン","ずんだ餅"],
+  ("kanazawa","food"):     ["近江町市場","のどぐろ"],
+  # ── 스팟 ──────────────────────────────────────────────────────
+  ("fukuoka","spots"):     ["中洲","天神_(福岡市)","スナック_(飲食店)"],
+  ("miyazaki","spots"):    ["宮崎市","飫肥_(日南市)"],
+  ("kagoshima","spots"):   ["天文館通り","鹿児島市"],
+  ("oita","spots"):        ["大分市","別府市"],
+  ("kumamoto","spots"):    ["下通_(熊本市)","熊本市"],
+  ("nagasaki","spots"):    ["浜町アーケード","稲佐山"],
+  ("naha","spots"):        ["松山_(那覇市)","三線"],
+  ("kitakyushu","spots"):  ["小倉城","旦過市場"],
+  ("hiroshima","spots"):   ["流川町_(広島市)","薬研堀通り_(広島市)"],
+  ("okayama","spots"):     ["奉還町","表町_(岡山市)"],
+  ("matsuyama","spots"):   ["銀天街_(松山市)","大街道"],
+  ("sapporo","spots"):     ["すすきの","歓楽街"],
+  ("hakodate","spots"):    ["大門横丁","函館市"],
+  ("sendai","spots"):      ["国分町_(仙台市)","仙台市"],
+  ("kanazawa","spots"):    ["片町_(金沢市)","木倉町_(金沢市)"],
+}
+
+
 def _build_sections(city, cat):
   """detail HTML을 <p><b> 경계로 파싱 → sections 리스트 생성
   각 섹션은 {name, detail, map_query, map_zoom, video} 딕셔너리"""
@@ -1290,12 +1344,16 @@ def _build_sections(city, cat):
       name = _re.sub(r'<[^>]+>', '', raw_name).strip()
     else:
       name = f"섹션 {i+1}"
+    # 위키피디아 기사명 (사진 동적 로딩용)
+    wiki_list = _SECTION_WIKI.get((city, cat), [])
+    photo_wiki = wiki_list[i] if i < len(wiki_list) else None
     sections.append({
       "name": name,
       "detail": part,
       "map_query": mq,
       "map_zoom": mz,
       "video": vid,
+      "photo_wiki": photo_wiki,
     })
   return sections
 
@@ -1520,6 +1578,14 @@ function _renderOvSections(d) {
     if (sec.name) {
       html += '<div class="ov-spot-name">📍 ' + sec.name + '</div>';
     }
+    // ── 사진 플레이스홀더 (Wikipedia API로 비동기 로딩) ──
+    if (sec.photo_wiki) {
+      const safeAlt = (sec.name || '').replace(/"/g, '&quot;');
+      html += '<div class="ov-spot-photo-wrap" style="display:none" data-sec-photo="' + i + '">'
+            + '<img class="ov-spot-photo-img" src="" alt="' + safeAlt + '" loading="lazy">'
+            + '<div class="ov-spot-photo-credit">© Wikipedia / CC BY-SA</div>'
+            + '</div>';
+    }
     if (sec.detail) {
       html += '<div class="ov-spot-detail ov-detail">' + sec.detail + '</div>';
     }
@@ -1552,6 +1618,41 @@ function _renderOvSections(d) {
     }
   });
   container.innerHTML = html;
+  // 사진 비동기 로딩 시작
+  _loadSectionPhotos(d.sections || []);
+}
+
+// ── Wikipedia Pageimages API 비동기 사진 로더 ─────────────────
+const _ovPhotoCache = {};
+async function _loadSectionPhotos(sections) {
+  for (let i = 0; i < sections.length; i++) {
+    const wiki = (sections[i] || {}).photo_wiki;
+    if (!wiki) continue;
+    const wrap = document.querySelector('[data-sec-photo="' + i + '"]');
+    if (!wrap) continue;
+    const img = wrap.querySelector('img');
+    try {
+      let src = _ovPhotoCache[wiki];
+      if (src === undefined) {
+        const apiUrl = 'https://ja.wikipedia.org/w/api.php?action=query'
+          + '&titles=' + encodeURIComponent(wiki)
+          + '&prop=pageimages&pithumbsize=480&format=json&origin=*';
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        const pages = data.query && data.query.pages;
+        src = '';
+        if (pages) {
+          const page = Object.values(pages)[0];
+          src = (page.thumbnail && page.thumbnail.source) || '';
+        }
+        _ovPhotoCache[wiki] = src;
+      }
+      if (src) {
+        img.src = src;
+        wrap.style.display = 'block';
+      }
+    } catch(e) { /* 이미지 없으면 조용히 실패 */ }
+  }
 }
 
 // 배경 클릭 시 닫기
@@ -1767,6 +1868,23 @@ OVERLAY_CSS_COMMON = """
   border:none;border-top:2px solid var(--ov-border);
   margin:20px 0;opacity:.6;
 }
+/* ── 섹션 사진 ── */
+.ov-spot-photo-wrap{
+  margin:8px 0 12px;position:relative;overflow:hidden;border-radius:9px;
+}
+.ov-spot-photo-img{
+  width:100%;height:190px;object-fit:cover;
+  border-radius:9px;display:block;
+  background:var(--ov-strat-bg);
+  transition:opacity .3s;
+}
+.ov-spot-photo-credit{
+  position:absolute;bottom:5px;right:7px;
+  font-size:9px;color:rgba(255,255,255,.80);
+  background:rgba(0,0,0,.38);padding:2px 6px;
+  border-radius:4px;pointer-events:none;
+  letter-spacing:.2px;
+}
 /* 방언 상세 버튼 */
 #ov-dialect-btn{
   display:none;width:100%;margin:16px 0 4px;
@@ -1791,6 +1909,7 @@ OVERLAY_CSS_COMMON = """
   .ov-strategy{padding:10px 12px;}
   .ov-section-label{margin:12px 0 5px;}
   .ov-spot-name{font-size:13px;padding:7px 11px;}
+  .ov-spot-photo-img{height:155px;}
   .ov-spot-map-frame{height:190px;}
   .ov-spot-vid-frame{height:175px;}
   .ov-spot-vid-wrap{padding:9px;}
@@ -1801,6 +1920,7 @@ OVERLAY_CSS_COMMON = """
   .ov-title{font-size:13px;}
   .ov-yt-embed iframe{height:160px;}
   #ov-map-frame{height:180px;}
+  .ov-spot-photo-img{height:130px;}
   .ov-spot-map-frame{height:165px;}
   .ov-spot-vid-frame{height:155px;}
 }
