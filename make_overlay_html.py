@@ -1916,51 +1916,93 @@ def build_overlay_js(theme="v3"):
 // ── 오버레이 시스템 ──────────────────────────────────────────
 let __ov_city = null, __ov_cat = null, __ov_vidIdx = 0;
 
+
 function showOverlay(city, cat) {
-  if (!window.__OV || !window.__OV[city] || !window.__OV[city][cat]) return;
-  __ov_city = city; __ov_cat = cat; __ov_vidIdx = 0;
-  const d = window.__OV[city][cat];
-  document.getElementById('ov-title').innerHTML = d.title || '';
+  const cityData = window.__OV_DATA[city];
+  if (!cityData) return;
+  const data = cityData[cat];
+  if (!data) return;
 
-  const hasSections = d.sections && d.sections.length > 0;
+  currentOvVideos = data.videos || [];
+  currentOvVideoIdx = 0;
 
-  // 멀티 섹션 vs 레거시 단일 레이아웃 전환
+  const modal = document.getElementById('ov-modal');
+  const title = document.getElementById('ov-title');
+  const detail = document.getElementById('ov-detail');
+  const strategy = document.getElementById('ov-strategy');
+  const secContainer = document.getElementById('ov-sections-container');
+  const mapSection = document.getElementById('ov-map-section');
   const detailWrap = document.getElementById('ov-detail-wrap');
-  const mapSec    = document.getElementById('ov-map-section');
-  const vidSec    = document.getElementById('ov-vid-section');
-  const secsCont  = document.getElementById('ov-sections-container');
+  const vidSection = document.getElementById('ov-vid-section');
 
-  if (hasSections) {
-    if (detailWrap) detailWrap.style.display = 'none';
-    mapSec.style.display  = 'none';
-    vidSec.style.display  = 'none';
-    secsCont.style.display = 'block';
-    _renderOvSections(d);
+  title.innerText = data.title || '상세 정보';
+  strategy.innerHTML = data.strategy || '';
+
+  // ── 멀티 섹션 (장소 상세 카드) 렌더링 ──
+  if (data.sections && data.sections.length > 0) {
+    secContainer.style.display = 'block';
+    mapSection.style.display = 'none';
+    detailWrap.style.display = 'none';
+    
+    let secHtml = '';
+    data.sections.forEach(sec => {
+      secHtml += `
+        <div class="ov-spot-section">
+          <div class="ov-spot-name">${sec.name}</div>
+          <div class="ov-spot-photo-wrap">
+            <img src="${sec.photo_url || ''}" class="ov-spot-photo-img" onerror="this.style.display='none'">
+          </div>
+          <div class="ov-spot-detail">${sec.detail}</div>
+          <div class="ov-spot-map-wrap">
+            <iframe class="ov-spot-map-frame" src="${sec.map_url}" allowfullscreen loading="lazy"></iframe>
+          </div>
+          <hr class="ov-spot-divider">
+        </div>`;
+    });
+    secContainer.innerHTML = secHtml;
   } else {
-    if (detailWrap) detailWrap.style.display = '';
-    secsCont.style.display = 'none';
-    secsCont.innerHTML = '';
-    document.getElementById('ov-detail').innerHTML = d.detail || '';
-    _renderOvVideo();
-    _renderOvMap(d);
+    secContainer.style.display = 'none';
+    mapSection.style.display = 'block';
+    detailWrap.style.display = 'block';
+    detail.innerHTML = data.detail || '';
+    document.getElementById('ov-map-frame').src = data.map_url || '';
   }
 
-  document.getElementById('ov-strategy').innerHTML = d.strategy || '';
-
-  // 방언 버튼: nanpa 오버레이에서만 표시 (dialect 데이터 있을 때)
-  const dialectBtn = document.getElementById('ov-dialect-btn');
-  if (dialectBtn) {
-    if (cat === 'nanpa' && window.__OV[city] && window.__OV[city]['dialect']) {
-      dialectBtn.style.display = 'block';
-      dialectBtn.onclick = function() { showOverlay(city, 'dialect'); };
-    } else {
-      dialectBtn.style.display = 'none';
-    }
+  // ── YouTube 타임라인 분석 표 렌더링 ──
+  renderOvVideo();
+  
+  if (data.videos && data.videos.length > 0 && data.videos[0].timeline) {
+    let timelineHtml = `
+      <div class="ov-section-label" style="margin-top:25px">📊 개연성 중심 타임라인 분석</div>
+      <table class="yt-timeline-table" style="width:100%; border-collapse:collapse; margin-top:10px; font-size:12px;">
+        <thead>
+          <tr style="background:var(--ov-nav-bg); color:var(--ov-nav-fg);">
+            <th style="padding:8px; text-align:left;">시점</th>
+            <th style="padding:8px; text-align:left;">분석 내용</th>
+            <th style="padding:8px; text-align:left;">개연성 포인트</th>
+          </tr>
+        </thead>
+        <tbody>`;
+    
+    data.videos[0].timeline.forEach(t => {
+      timelineHtml += `
+        <tr style="border-bottom:1px solid var(--ov-border);">
+          <td style="padding:8px;"><span style="background:var(--ov-strat-border); color:#fff; padding:2px 6px; border-radius:4px; font-weight:bold;">${t.time}</span></td>
+          <td style="padding:8px;">${t.content}</td>
+          <td style="padding:8px; color:var(--ov-link); font-weight:bold;">${t.relevance}</td>
+        </tr>`;
+    });
+    timelineHtml += `</tbody></table>`;
+    
+    // 비디오 섹션 하단에 표 주입
+    const vidInner = document.getElementById('ov-vid-inner');
+    vidInner.innerHTML += timelineHtml;
   }
 
-  document.getElementById('ov-modal').style.display = 'flex';
+  modal.style.display = 'flex';
   document.body.style.overflow = 'hidden';
 }
+
 
 function closeOverlay() {
   document.getElementById('ov-modal').style.display = 'none';
